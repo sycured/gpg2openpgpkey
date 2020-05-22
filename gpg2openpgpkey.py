@@ -10,27 +10,26 @@ import os, sys, time, getopt, email.utils
 import tempfile, shutil, subprocess, threading, binascii, base64, hashlib
 from tempfile import mkdtemp
 
-PROGNAME    = os.path.basename(sys.argv[0])
-VERSION     = "0.1"
-GPG         = "gpg"
+PROGNAME = os.path.basename(sys.argv[0])
+VERSION = "0.1"
+GPG = "gpg"
 GPG_TIMEOUT = 5
-DIR         = "/var/tmp/openpgpkey"
-GPGDIR      = None
-GENERIC     = False                            # Generate generic rdata?
-
+DIR = "/var/tmp/openpgpkey"
+GPGDIR = None
+GENERIC = False  # Generate generic rdata?
 
 # from gnupg2 source common/openpgpdefs.h
 ALG_PUBKEY = {
     1: "RSA",
-    2: "RSA Encrypt-Only",                     # Deprecated
-    3: "RSA Sign-Only",                        # Deprecated
-    16: "Elgamal Encrypt-Only",                # Deprecated
+    2: "RSA Encrypt-Only",  # Deprecated
+    3: "RSA Sign-Only",  # Deprecated
+    16: "Elgamal Encrypt-Only",  # Deprecated
     17: "DSA",
-    18: "ECDH",                                # Generic ECC
+    18: "ECDH",  # Generic ECC
     19: "ECDSA",
     20: "Elgamal",
     21: "Diffie-Hellman",
-    22: "Ed25519",                             # Squatting (not official)
+    22: "Ed25519",  # Squatting (not official)
 }
 
 
@@ -74,10 +73,10 @@ def stringchunks(s, n):
     """Yield n-octet sized chunks from string s"""
     if sys.version_info.major == 3:
         for i in range(0, len(s), n):
-            yield s[i:i+n]
+            yield s[i:i + n]
     else:
         for i in xrange(0, len(s), n):
-            yield s[i:i+n]
+            yield s[i:i + n]
 
 
 def string2bytes(s, encoding='utf-8'):
@@ -132,7 +131,7 @@ def parse_key(indata, keydata):
                 error_quit(11, "ERROR: more than one public key given.")
             pubkeySeen = True
             _, _, keylength, alg, keyid, createDate, _, _, _, _, _, \
-                keycap = parts[:12]
+            keycap = parts[:12]
             p = OpenPGPKey(keyid, alg, keylength, keycap, createDate,
                            keydata=keydata)
             currentKey = p
@@ -148,7 +147,7 @@ def parse_key(indata, keydata):
             if not pubkeySeen:
                 error_quit(11, "ERROR: subkey without preceding pubkey.")
             _, _, keylength, alg, keyid, createDate, _, _, _, _, _, \
-                keycap = parts[:12]
+            keycap = parts[:12]
             s = OpenPGPKey(keyid, alg, keylength, keycap, createDate)
             currentKey = s
             p.add_subkey(s)
@@ -171,9 +170,9 @@ class OpenPGPKey:
         self.keylen = int(keylen)
         self.flags = flags
         self.createDate = float(date)
-        self.uidlist = []               # list of rfc822 (name, address) tuples
-        self.subkeys = []               # list of OpenPGPKey objects
-        self.errors = []                # list of collected errors in parsing
+        self.uidlist = []  # list of rfc822 (name, address) tuples
+        self.subkeys = []  # list of OpenPGPKey objects
+        self.errors = []  # list of collected errors in parsing
         if keydata:
             self.keydata = keydata
         else:
@@ -298,7 +297,6 @@ def error_quit(rc, msg):
 
 
 if __name__ == '__main__':
-
 
     uid, infile = process_args(sys.argv[1:])
     uid = validate_uid(uid)
