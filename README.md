@@ -1,6 +1,7 @@
 # gpg2openpgpkey
 DNS OPENPGPKEY record generator  
-Author: Shumon Huque
+Original author: Shumon Huque  
+Forked by: sycured
 
 A command line program that generates a DNS OPENPGPKEY resource record
 (in textual presentation format) from a given email address and file 
@@ -8,7 +9,7 @@ containing a GPG key.
 
 Pre-requisites:  
 - GNUpg, version 2.x (recommended, although works with 1.x too)
-- Python 2.7 or later, or Python 3  
+- Python 3.x
 
 ```
 $ gpg2openpgpkey.py

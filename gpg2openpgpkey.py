@@ -81,12 +81,8 @@ def process_args(arguments):
 
 def stringchunks(s, n):
     """Yield n-octet sized chunks from string s"""
-    if version_info.major == 3:
-        for i in range(0, len(s), n):
-            yield s[i:i + n]
-    else:
-        for i in xrange(0, len(s), n):
-            yield s[i:i + n]
+    for i in range(0, len(s), n):
+        yield s[i:i + n]
 
 
 def string2bytes(s, encoding='utf-8'):
