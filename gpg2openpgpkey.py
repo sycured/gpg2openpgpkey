@@ -1,16 +1,25 @@
 #!/usr/bin/python
 #
-# Given a UID and a file containing a GPG key, generate the 
+# Given a UID and a file containing a GPG key, generate the
 # corresponding OPENPGPKEY DNS record in presentation format.
 #
 # Tested with gnupg 1.x and 2.x.
 #
 
-import os, sys, time, getopt, email.utils
-import tempfile, shutil, subprocess, threading, binascii, base64, hashlib
+from base64 import standard_b64encode
+from binascii import hexlify
+from email.utils import parseaddr, formataddr
+from getopt import getopt, GetoptError
+from hashlib import sha256
+from os.path import basename
+from shutil import rmtree
+from subprocess import Popen, PIPE, STDOUT
+from sys import exit, argv, version_info
 from tempfile import mkdtemp
+from threading import Thread
+from time import strftime, gmtime
 
-PROGNAME = os.path.basename(sys.argv[0])
+PROGNAME = basename(argv[0])
 VERSION = "0.1"
 GPG = "gpg"
 GPG_TIMEOUT = 5
@@ -34,7 +43,8 @@ ALG_PUBKEY = {
 
 
 def usage(msg=None):
-    if msg: print("Error: {}\n".format(msg))
+    if msg:
+        print("Error: {}\n".format(msg))
     print("""\
 {0} version {1}
 Usage: {0} [-g] [-h] <email> <gpgkeyfile>
@@ -46,15 +56,15 @@ Given an email address and a file containing a GPG public key, this program
 generates a corresponding DNS OPENPGPKEY resource record in presentation
 format.
 """.format(PROGNAME, VERSION))
-    sys.exit(2)
+    exit(2)
 
 
 def process_args(arguments):
     """Process command line arguments"""
     global GENERIC
     try:
-        (options, args) = getopt.getopt(sys.argv[1:], 'g')
-    except getopt.GetoptError:
+        (options, args) = getopt(argv[1:], 'g')
+    except GetoptError:
         usage()
 
     if len(args) != 2:
@@ -71,7 +81,7 @@ def process_args(arguments):
 
 def stringchunks(s, n):
     """Yield n-octet sized chunks from string s"""
-    if sys.version_info.major == 3:
+    if version_info.major == 3:
         for i in range(0, len(s), n):
             yield s[i:i + n]
     else:
@@ -106,7 +116,7 @@ def cmd_gpg_export(homedir, uid):
 
 
 def unixtime2date(t):
-    return time.strftime("%Y-%m-%d", time.gmtime(t))
+    return strftime("%Y-%m-%d", gmtime(t))
 
 
 def parse_key(indata, keydata):
@@ -130,8 +140,8 @@ def parse_key(indata, keydata):
             if pubkeySeen:
                 error_quit(11, "ERROR: more than one public key given.")
             pubkeySeen = True
-            _, _, keylength, alg, keyid, createDate, _, _, _, _, _, \
-            keycap = parts[:12]
+            _, _, keylength, alg, keyid, createDate, _, _, _, _, _, keycap = \
+                parts[:12]
             p = OpenPGPKey(keyid, alg, keylength, keycap, createDate,
                            keydata=keydata)
             currentKey = p
@@ -146,8 +156,8 @@ def parse_key(indata, keydata):
         elif rectype == 'sub':
             if not pubkeySeen:
                 error_quit(11, "ERROR: subkey without preceding pubkey.")
-            _, _, keylength, alg, keyid, createDate, _, _, _, _, _, \
-            keycap = parts[:12]
+            _, _, keylength, alg, keyid, createDate, _, _, _, _, _, keycap = \
+                parts[:12]
             s = OpenPGPKey(keyid, alg, keylength, keycap, createDate)
             currentKey = s
             p.add_subkey(s)
@@ -185,7 +195,7 @@ class OpenPGPKey:
         self.errors.append(error)
 
     def add_uid(self, uid):
-        name, address = email.utils.parseaddr(uid)
+        name, address = parseaddr(uid)
         if '@' not in address:
             self.add_error("Unable to parse uid: {}".format(uid))
         else:
@@ -195,7 +205,7 @@ class OpenPGPKey:
         self.subkeys.append(subkey)
 
     def has_uid(self, uid):
-        name, address = email.utils.parseaddr(uid)
+        name, address = parseaddr(uid)
         return address in [x[1] for x in self.uidlist]
 
     def Info(self, subkey=False):
@@ -205,7 +215,7 @@ class OpenPGPKey:
             self.alg, ALG_PUBKEY.get(self.alg), self.keylen, self.flags)
         out += "  CreateDate: {}\n".format(unixtime2date(self.createDate))
         for u in self.uidlist:
-            out += "    uid: {}\n".format(email.utils.formataddr(u))
+            out += "    uid: {}\n".format(formataddr(u))
         for s in self.subkeys:
             out += s.Info(subkey=True)
         if self.errors:
@@ -218,10 +228,10 @@ class OpenPGPKey:
         return self.Info()
 
 
-class RunProgram(threading.Thread):
+class RunProgram(Thread):
 
     def __init__(self, cmd, indata, timeout):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
         self.cmd = cmd
         self.indata = indata
         self.indata = string2bytes(indata)
@@ -229,10 +239,10 @@ class RunProgram(threading.Thread):
         self.output = ""
 
     def run(self):
-        self.p = subprocess.Popen(self.cmd,
-                                  stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT)
+        self.p = Popen(self.cmd,
+                       stdin=PIPE,
+                       stdout=PIPE,
+                       stderr=STDOUT)
         self.output = self.p.communicate(input=self.indata)[0]
         self.returncode = self.p.returncode
 
@@ -246,7 +256,7 @@ class RunProgram(threading.Thread):
 
 
 def validate_uid(inputstring):
-    name, address = email.utils.parseaddr(inputstring)
+    name, address = parseaddr(inputstring)
     if "@" in address:
         return address
     else:
@@ -256,7 +266,7 @@ def validate_uid(inputstring):
 def get_ownername(emailaddr):
     """Return OPENPGPKEY ownername for given PGP uid/email address"""
     localpart, rhs = emailaddr.split('@')
-    h = hashlib.sha256()
+    h = sha256()
     h.update(string2bytes(localpart))
     owner = "%s._openpgpkey.%s" % (h.hexdigest()[0:56], rhs)
     if not owner.endswith('.'):
@@ -268,19 +278,19 @@ def gen_openpgpkey(emailaddr, keydata, generic=False):
     owner = get_ownername(emailaddr)
     if not generic:
         output = "{} IN OPENPGPKEY (\n".format(owner)
-        for line in stringchunks(base64.standard_b64encode(keydata), 60):
+        for line in stringchunks(standard_b64encode(keydata), 60):
             output += "                  {}\n".format(line.decode())
     else:
         output = "{} IN TYPE61 \# {} (\n".format(owner, len(keydata))
-        for line in stringchunks(binascii.hexlify(keydata), 60):
+        for line in stringchunks(hexlify(keydata), 60):
             output += "                  {}\n".format(line.decode())
     output += ")"
     return output
 
 
-def rmtree(pathname):
+def do_rmtree(pathname):
     try:
-        shutil.rmtree(pathname)
+        rmtree(pathname)
     except:
         # send this to syslog instead if cgi program
         print("Error: failed to remove temporary directory.")
@@ -291,17 +301,17 @@ def rmtree(pathname):
 
 def error_quit(rc, msg):
     print("ERROR: {}; rc={}".format(msg, rc))
-    if GPGDIR and (not rmtree(GPGDIR)):
+    if GPGDIR and (not do_rmtree(GPGDIR)):
         print("ERROR: deleting temp dir: {}".format(GPGDIR))
-    sys.exit(1)
+    exit(1)
 
 
 if __name__ == '__main__':
 
-    uid, infile = process_args(sys.argv[1:])
+    uid, infile = process_args(argv[1:])
     uid = validate_uid(uid)
     if not uid:
-        error_quit(11, "invalid uid specified", None)
+        error_quit(11, "invalid uid specified")
     keydata = open(infile).read()
 
     GPGDIR = mkdtemp(prefix="x", dir=DIR)
@@ -332,6 +342,6 @@ if __name__ == '__main__':
 
     print(gen_openpgpkey(uid, c.output, generic=GENERIC))
 
-    if not rmtree(GPGDIR):
+    if not do_rmtree(GPGDIR):
         print("ERROR: deleting gpg directory: {}".format(GPGDIR))
-        sys.exit(11)
+        exit(11)
