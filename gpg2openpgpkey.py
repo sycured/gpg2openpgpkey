@@ -8,16 +8,16 @@
 
 from base64 import standard_b64encode
 from binascii import hexlify
-from email.utils import parseaddr, formataddr
+from email.utils import formataddr, parseaddr
 from getopt import getopt, GetoptError
 from hashlib import sha256
 from os.path import basename
 from shutil import rmtree
 from subprocess import Popen, PIPE, STDOUT
-from sys import exit, argv, version_info
+from sys import argv, exit
 from tempfile import mkdtemp
 from threading import Thread
-from time import strftime, gmtime
+from time import gmtime, strftime
 
 PROGNAME = basename(argv[0])
 VERSION = "0.1"
