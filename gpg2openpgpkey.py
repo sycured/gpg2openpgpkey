@@ -179,10 +179,7 @@ class OpenPGPKey:
         self.uidlist = []  # list of rfc822 (name, address) tuples
         self.subkeys = []  # list of OpenPGPKey objects
         self.errors = []  # list of collected errors in parsing
-        if keydata:
-            self.keydata = keydata
-        else:
-            self.keydata = None
+        self.keydata = keydata if keydata else None
 
     def set_fingerprint(self, fpr):
         self.fingerprint = fpr
